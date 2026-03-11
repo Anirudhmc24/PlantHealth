@@ -2,7 +2,6 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const sharp = require('sharp');
 const fs = require('fs');
 
 const { detectDisease } = require('../services/huggingface');
@@ -15,7 +14,7 @@ const router = express.Router();
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, './uploads/'),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
     cb(null, `${uuidv4()}${ext}`);
   },
 });
@@ -37,18 +36,11 @@ router.post('/', upload.single('image'), async (req, res) => {
     return res.status(400).json({ success: false, error: 'No image uploaded.' });
   }
 
-  const originalPath = req.file.path;
-  const processedPath = originalPath.replace(/(\.\w+)$/, '_processed$1');
+  const imagePath = req.file.path;
 
   try {
-    // Resize to 224×224 for MobileNet
-    await sharp(originalPath)
-      .resize(224, 224, { fit: 'cover' })
-      .jpeg({ quality: 90 })
-      .toFile(processedPath);
-
-    // 1️⃣ HuggingFace disease detection
-    const diagnosis = await detectDisease(processedPath);
+    // 1️⃣ HuggingFace disease detection (send image directly, no resize)
+    const diagnosis = await detectDisease(imagePath);
 
     // 2️⃣ Claude treatment recommendations
     const treatmentAdvice = await getTreatmentAdvice(diagnosis);
@@ -62,9 +54,6 @@ router.post('/', upload.single('image'), async (req, res) => {
       treatment_advice: treatmentAdvice,
     };
     await saveScan(scan);
-
-    // Cleanup processed file
-    fs.unlink(processedPath, () => {});
 
     return res.json({
       success: true,
@@ -83,10 +72,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     });
 
   } catch (err) {
-    // Clean up files on error
-    [originalPath, processedPath].forEach(p => {
-      if (fs.existsSync(p)) fs.unlink(p, () => {});
-    });
+    if (fs.existsSync(imagePath)) fs.unlink(imagePath, () => {});
     console.error('Detection error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -97,7 +83,6 @@ router.get('/:id', async (req, res) => {
   try {
     const scan = await getScanById(req.params.id);
     if (!scan) return res.status(404).json({ success: false, error: 'Scan not found.' });
-
     return res.json({
       success: true,
       scan: {
