@@ -14,14 +14,57 @@ function initDB() {
     db.defaults({
       scans: [],
       chat_sessions: [],
-      feedback: []
+      feedback: [],
+      users: [],
+      sessions: [],
     }).write();
     console.log('✅ Database ready (lowdb JSON)');
     resolve();
   });
 }
 
-// ── Scan helpers ──────────────────────────────────────────────────────────────
+function createUser(user) {
+  return new Promise((resolve) => {
+    db.get('users').push(user).write();
+    resolve(user.id);
+  });
+}
+
+function getUserByEmail(email) {
+  return new Promise((resolve) => {
+    const user = db.get('users').find({ email }).value();
+    resolve(user || null);
+  });
+}
+
+function getUserById(id) {
+  return new Promise((resolve) => {
+    const user = db.get('users').find({ id }).value();
+    resolve(user || null);
+  });
+}
+
+function saveSession(session) {
+  return new Promise((resolve) => {
+    db.get('sessions').push(session).write();
+    resolve();
+  });
+}
+
+function getSession(token) {
+  return new Promise((resolve) => {
+    const session = db.get('sessions').find({ token }).value();
+    resolve(session || null);
+  });
+}
+
+function deleteSession(token) {
+  return new Promise((resolve) => {
+    db.get('sessions').remove({ token }).write();
+    resolve();
+  });
+}
+
 function saveScan(scan) {
   return new Promise((resolve) => {
     const record = {
@@ -51,7 +94,6 @@ function getAllScans(limit = 50) {
   });
 }
 
-// ── Chat helpers ──────────────────────────────────────────────────────────────
 function saveChatSession(session) {
   return new Promise((resolve) => {
     const existing = db.get('chat_sessions').find({ id: session.id }).value();
@@ -81,7 +123,6 @@ function getChatSession(id) {
   });
 }
 
-// ── Feedback helpers ──────────────────────────────────────────────────────────
 function saveFeedback(feedback) {
   return new Promise((resolve) => {
     db.get('feedback').push({
@@ -110,6 +151,8 @@ function getFeedbackStats() {
 
 module.exports = {
   initDB,
+  createUser, getUserByEmail, getUserById,
+  saveSession, getSession, deleteSession,
   saveScan, getScanById, getAllScans,
   saveChatSession, getChatSession,
   saveFeedback, getFeedbackStats,

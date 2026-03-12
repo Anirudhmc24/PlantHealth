@@ -10,6 +10,7 @@ const detectRoutes = require('./routes/detect');
 const chatRoutes = require('./routes/chat');
 const feedbackRoutes = require('./routes/feedback');
 const historyRoutes = require('./routes/history');
+const authRoutes = require('./routes/auth');
 const { initDB } = require('./services/database');
 
 const app = express();
@@ -23,8 +24,12 @@ const PORT = process.env.PORT || 3000;
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim());
 app.use(cors({
-  origin: '*',
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -37,11 +42,11 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/detect',        detectRoutes);
-app.use('/api/detect-base64', detectRoutes);
+app.use('/api/detect',   detectRoutes);
 app.use('/api/chat',     chatRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/history',  historyRoutes);
+app.use('/api/auth',     authRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
