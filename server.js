@@ -37,7 +37,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/detect',   detectRoutes);
+app.use('/api/detect',        detectRoutes);
+app.use('/api/detect-base64', detectRoutes);
 app.use('/api/chat',     chatRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/history',  historyRoutes);

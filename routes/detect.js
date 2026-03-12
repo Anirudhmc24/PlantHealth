@@ -30,30 +30,68 @@ const upload = multer({
   },
 });
 
-// ── POST /api/detect ──────────────────────────────────────────────────────────
+// ── Shared processing logic ───────────────────────────────────────────────────
+async function processImage(imagePath, filename) {
+  const diagnosis = await detectDisease(imagePath);
+  const treatmentAdvice = await getTreatmentAdvice(diagnosis);
+  const scanId = uuidv4();
+  const scan = {
+    id: scanId,
+    image_path: filename,
+    ...diagnosis,
+    treatment_advice: treatmentAdvice,
+  };
+  await saveScan(scan);
+  return { scanId, diagnosis, treatmentAdvice, filename };
+}
+
+// ── POST /api/detect — multipart (mobile) ─────────────────────────────────────
 router.post('/', upload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No image uploaded.' });
   }
-
   const imagePath = req.file.path;
+  try {
+    const { scanId, diagnosis, treatmentAdvice, filename } = await processImage(imagePath, req.file.filename);
+    return res.json({
+      success: true,
+      scan_id: scanId,
+      diagnosis: {
+        crop_type: diagnosis.crop_type,
+        disease_name: diagnosis.disease_name,
+        confidence: diagnosis.confidence,
+        severity_level: diagnosis.severity_level,
+        affected_area_percent: diagnosis.affected_area_percent,
+        low_confidence: diagnosis.low_confidence,
+        top_predictions: diagnosis.raw_predictions,
+      },
+      treatment_advice: treatmentAdvice,
+      image_url: `/uploads/${filename}`,
+    });
+  } catch (err) {
+    if (fs.existsSync(imagePath)) fs.unlink(imagePath, () => {});
+    console.error('Detection error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/detect-base64 — base64 (web) ───────────────────────────────────
+router.post('/base64', async (req, res) => {
+  const { image, filename } = req.body;
+  if (!image) {
+    return res.status(400).json({ success: false, error: 'No image data provided.' });
+  }
+
+  const ext = path.extname(filename || 'leaf.jpg').toLowerCase() || '.jpg';
+  const savedFilename = `${uuidv4()}${ext}`;
+  const imagePath = `./uploads/${savedFilename}`;
 
   try {
-    // 1️⃣ HuggingFace disease detection (send image directly, no resize)
-    const diagnosis = await detectDisease(imagePath);
+    // Decode base64 and save to disk
+    const buffer = Buffer.from(image, 'base64');
+    fs.writeFileSync(imagePath, buffer);
 
-    // 2️⃣ Claude treatment recommendations
-    const treatmentAdvice = await getTreatmentAdvice(diagnosis);
-
-    // 3️⃣ Save to DB
-    const scanId = uuidv4();
-    const scan = {
-      id: scanId,
-      image_path: req.file.filename,
-      ...diagnosis,
-      treatment_advice: treatmentAdvice,
-    };
-    await saveScan(scan);
+    const { scanId, diagnosis, treatmentAdvice } = await processImage(imagePath, savedFilename);
 
     return res.json({
       success: true,
@@ -68,12 +106,11 @@ router.post('/', upload.single('image'), async (req, res) => {
         top_predictions: diagnosis.raw_predictions,
       },
       treatment_advice: treatmentAdvice,
-      image_url: `/uploads/${req.file.filename}`,
+      image_url: `/uploads/${savedFilename}`,
     });
-
   } catch (err) {
     if (fs.existsSync(imagePath)) fs.unlink(imagePath, () => {});
-    console.error('Detection error:', err.message);
+    console.error('Base64 detection error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
