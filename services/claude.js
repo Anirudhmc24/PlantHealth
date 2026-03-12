@@ -1,100 +1,110 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const axios = require('axios');
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = 'claude-opus-4-5';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-// ── System prompt ─────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are an expert agricultural plant pathologist assistant helping farmers diagnose and treat plant diseases.
+async function getTreatmentAdvice(diagnosis) {
+  const { crop_type, disease_name, confidence, severity_level, affected_area_percent } = diagnosis;
 
-Your responses must:
-- Be practical and actionable — farmers need to act NOW
-- Use simple language, avoiding complex scientific jargon
-- Structure treatment advice clearly: immediate steps first, then ongoing care
-- Always mention safety precautions for chemical treatments
-- Suggest both chemical AND organic/eco-friendly alternatives
-- Flag clearly when professional agronomist consultation is needed (severe cases)
-- Be concise — max 300 words for recommendations
+  const prompt = `You are an expert agricultural plant pathologist. A farmer's plant has been diagnosed with the following:
 
-Response format for treatment advice (use exactly these section headers):
-**🔍 Diagnosis Summary**
-**⚠️ Severity & Urgency**
-**🌿 Immediate Actions (Today)**
-**💊 Treatment Options**
-- Chemical: [product, dosage, frequency]
-- Organic: [eco-friendly alternative]
-**🛡️ Prevention & Future Care**
-**👨‍🌾 Expert Consultation Needed?** [Yes/No + reason]`;
-
-// ── Treatment recommendations ─────────────────────────────────────────────────
-async function getTreatmentAdvice(diagnosisData) {
-  const { crop_type, disease_name, confidence, severity_level, affected_area_percent } = diagnosisData;
-
-  const userPrompt = `
-Plant scan results:
 - Crop: ${crop_type}
-- Disease detected: ${disease_name}
+- Disease: ${disease_name}
 - Confidence: ${confidence}%
 - Severity: ${severity_level}
-- Affected leaf area: ${affected_area_percent}%
+- Affected Area: ${affected_area_percent}%
 
-Please provide complete treatment recommendations for this farmer.
-  `.trim();
+Provide practical treatment advice in this exact markdown format:
 
-  const message = await client.messages.create({
-    model: MODEL,
-    max_tokens: 800,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
+## Diagnosis Summary
+Brief 2-sentence summary of the disease and its impact.
 
-  return message.content[0].text;
+## Immediate Actions
+- Action 1
+- Action 2
+- Action 3
+
+## Chemical Treatment
+Specific fungicides/pesticides with dosage and application method.
+
+## Organic/Natural Treatment
+Natural alternatives that are eco-friendly.
+
+## Prevention Tips
+How to prevent recurrence.
+
+## Recovery Timeline
+Expected recovery time with proper treatment.
+
+Keep advice practical, specific, and suitable for Indian farmers.`;
+
+  try {
+    const response = await axios.post(GEMINI_URL, {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+    }, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 30000,
+    });
+
+    const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('No response from Gemini');
+    return text;
+  } catch (err) {
+    console.error('Gemini error:', err.response?.data || err.message);
+    // Fallback response if API fails
+    return `## Treatment Advice for ${disease_name}
+
+**Severity:** ${severity_level} | **Confidence:** ${confidence}%
+
+## Immediate Actions
+- Remove and destroy infected plant parts
+- Improve air circulation around plants
+- Avoid overhead watering
+
+## Treatment
+Apply appropriate fungicide/pesticide based on the disease type. Consult your local agricultural extension office for specific recommendations.
+
+## Prevention
+- Practice crop rotation
+- Use disease-resistant varieties
+- Maintain proper plant spacing`;
+  }
 }
 
-// ── Conversational Q&A ────────────────────────────────────────────────────────
-async function chat(messages, scanContext) {
-  const contextBlock = scanContext
-    ? `Current scan context:
-- Crop: ${scanContext.crop_type}
-- Disease: ${scanContext.disease_name}
-- Severity: ${scanContext.severity_level}
-- Confidence: ${scanContext.confidence}%
-- Affected area: ${scanContext.affected_area_percent}%
-- Initial treatment advice already given.
+async function getChatResponse({ message, scanContext, conversationHistory }) {
+  const systemPrompt = `You are PlantCare AI, an expert agricultural assistant specializing in plant diseases. 
+You help farmers identify and treat plant diseases. Be concise, practical, and helpful.
+${scanContext ? `\nCurrent scan context: ${JSON.stringify(scanContext)}` : ''}`;
 
-Answer farmer questions based on this specific diagnosis.`
-    : 'No specific scan context. Answer general plant disease and farming questions.';
+  const history = (conversationHistory || []).map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }],
+  }));
 
-  const fullSystem = `${SYSTEM_PROMPT}\n\n${contextBlock}`;
+  const contents = [
+    { role: 'user', parts: [{ text: systemPrompt }] },
+    { role: 'model', parts: [{ text: 'Understood! I am PlantCare AI, ready to help with plant disease diagnosis and treatment.' }] },
+    ...history,
+    { role: 'user', parts: [{ text: message }] },
+  ];
 
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 500,
-    system: fullSystem,
-    messages: messages.map(m => ({ role: m.role, content: m.content })),
-  });
+  try {
+    const response = await axios.post(GEMINI_URL, {
+      contents,
+      generationConfig: { temperature: 0.7, maxOutputTokens: 512 },
+    }, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 30000,
+    });
 
-  return response.content[0].text;
+    const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('No response from Gemini');
+    return text;
+  } catch (err) {
+    console.error('Gemini chat error:', err.response?.data || err.message);
+    throw new Error('Chat service temporarily unavailable. Please try again.');
+  }
 }
 
-// ── Feedback-aware re-analysis ────────────────────────────────────────────────
-async function getImprovedAdvice(originalDiagnosis, feedbackContext) {
-  const prompt = `
-A farmer reported that our diagnosis was incorrect.
-Original diagnosis: ${originalDiagnosis.disease_name} on ${originalDiagnosis.crop_type}
-Farmer's correction: ${feedbackContext.correct_disease || 'not specified'}
-Additional comments: ${feedbackContext.comments || 'none'}
-
-Please provide revised treatment advice based on the farmer's feedback.
-  `.trim();
-
-  const message = await client.messages.create({
-    model: MODEL,
-    max_tokens: 800,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  return message.content[0].text;
-}
-
-module.exports = { getTreatmentAdvice, chat, getImprovedAdvice };
+module.exports = { getTreatmentAdvice, getChatResponse };
