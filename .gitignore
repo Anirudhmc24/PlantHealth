@@ -5,4 +5,3 @@ uploads/
 *.db 
 venv/
 __pycache__/
-*.pth
