@@ -3,3 +3,6 @@ data/
 uploads/ 
 .env 
 *.db 
+venv/
+__pycache__/
+*.pth
