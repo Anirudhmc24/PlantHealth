@@ -59,7 +59,7 @@ HUGGINGFACE_API_KEY=your_hf_key_here    # (Not needed if using local model)
 
 ## 4. Setting Up the Local AI Model (Python)
 
-We use a custom-trained **MobileNetV2** model to classify wheat leaf diseases into 3 classes: `Healthy`, `Septoria`, and `Stripe Rust`. The trained model is already included in the repository at `training/wheat_leaf_model.pth`.
+We use a custom-trained **MobileNetV2** model to classify plant diseases across multiple crops (**Wheat, Corn, and Rice**). The trained model is included in the repository at `training/plant_health_model.pth`.
 
 ### Set Up Python Environment
 ```bash
@@ -129,21 +129,19 @@ Now open your browser and go to **http://localhost:3000**
 
 ---
 
-## 7. Re-Training the Model (Optional)
-
-If you want to train the model yourself on the original dataset:
-
-### Download the Dataset
-Download from Kaggle: [Wheat Leaf Dataset](https://www.kaggle.com/datasets/olyadgetch/wheat-leaf-dataset?resource=download)
-
-Place the folders into `data/wheat_leaf/` so the structure looks like:
+### Adding New Crops
+You can expand the model's capability by simply dropping new crop folders into `data/`. The structure should be:
 ```
 PlantHealth/
 ├── data/
-│   └── wheat_leaf/
-│       ├── Healthy/
-│       ├── septoria/
-│       └── stripe_rust/
+│   ├── wheat_leaf/
+│   │   ├── Healthy/
+│   │   └── septoria/
+│   ├── corn_leaf/
+│   │   ├── Blight/
+│   │   └── Healthy/
+│   └── rice_leaf/
+│       └── Brown spot/
 ```
 
 ### Run Training
@@ -152,10 +150,9 @@ cd training
 # (Make sure venv is activated)
 python train.py
 ```
-- Training runs for 5 epochs using transfer learning on MobileNetV2
-- Automatically uses GPU (CUDA) if available, otherwise CPU
-- Saves the best model to `training/wheat_leaf_model.pth`
-- Achieves ~86.6% validation accuracy on this dataset
+- The script automatically scans all folders in `data/` and creates a multi-class model.
+- Training runs for 10 epochs using transfer learning.
+- Saves the best model to `training/plant_health_model.pth`.
 
 ---
 
@@ -208,11 +205,11 @@ PlantHealth/
 │   ├── huggingface.js         # Local AI model client
 │   └── claude.js              # Gemini treatment advice client
 ├── training/                  # ML training pipeline
-│   ├── train.py               # PyTorch model training script
+│   ├── train.py               # PyTorch model training script (supports multi-crop)
 │   ├── predict.py             # CLI prediction utility
 │   ├── inference_server.py    # FastAPI local model server (port 5001)
 │   ├── requirements.txt       # Python dependencies
-│   └── wheat_leaf_model.pth   # Trained model weights
+│   └── plant_health_model.pth # Trained multi-crop model weights
 └── data/                      # Runtime data (git-ignored)
     └── plantdisease.db / db.json
 ```

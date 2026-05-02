@@ -1,10 +1,22 @@
 import sys
+import os
 import torch
 import torch.nn as nn
 from torchvision import models, transforms
 from PIL import Image
 
-def predict(image_path, model_path='wheat_leaf_model.pth'):
+def predict(image_path, model_path=None):
+    if model_path is None:
+        # Check for multi-crop model first, then legacy wheat model
+        model_path = 'plant_health_model.pth'
+        if not os.path.exists(model_path):
+            model_path = 'wheat_leaf_model.pth'
+
+    if not os.path.exists(model_path):
+        print(f"Error: Model file {model_path} not found.")
+        return
+
+    print(f"Using model: {model_path}")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # Load checkpoint
@@ -37,13 +49,18 @@ def predict(image_path, model_path='wheat_leaf_model.pth'):
             outputs = model(input_tensor)
             probabilities = torch.nn.functional.softmax(outputs[0], dim=0)
             
-        print(f"Prediction for {image_path}:")
-        for i in range(len(classes)):
-            print(f"{classes[i]}: {probabilities[i].item()*100:.2f}%")
+        print(f"\nResults for: {image_path}")
+        print("-" * 30)
+        
+        # Sort by probability
+        probs, indices = torch.sort(probabilities, descending=True)
+        
+        for i in range(min(5, len(classes))):
+            idx = indices[i].item()
+            print(f"{classes[idx]:<25}: {probs[i].item()*100:>6.2f}%")
             
-        _, preds = torch.max(outputs, 1)
-        predicted_class = classes[preds[0].item()]
-        print(f"---")
+        print("-" * 30)
+        predicted_class = classes[indices[0].item()]
         print(f"Final Prediction: {predicted_class}")
         
     except Exception as e:
@@ -51,6 +68,8 @@ def predict(image_path, model_path='wheat_leaf_model.pth'):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Usage: python predict.py <image_path>")
+        print("Usage: python predict.py <image_path> [model_path]")
     else:
-        predict(sys.argv[1])
+        img_path = sys.argv[1]
+        mod_path = sys.argv[2] if len(sys.argv) > 2 else None
+        predict(img_path, mod_path)

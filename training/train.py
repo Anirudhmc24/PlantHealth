@@ -2,21 +2,76 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms, models
+from torch.utils.data import DataLoader, random_split, Dataset
+from torchvision import transforms, models
+from PIL import Image
 from tqdm import tqdm
 
+class MultiCropDataset(Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.samples = []
+        self.classes = []
+        
+        # Crops to ignore (database files etc)
+        ignore = ['db.json', 'plantdisease.db', 'plantdisease.db-shm', 'plantdisease.db-wal']
+        
+        print(f"Scanning data directory: {root_dir}")
+        for crop in sorted(os.listdir(root_dir)):
+            if crop in ignore: continue
+            crop_path = os.path.join(root_dir, crop)
+            if not os.path.isdir(crop_path): continue
+            
+            print(f"  Processing crop: {crop}")
+            for cls in sorted(os.listdir(crop_path)):
+                cls_path = os.path.join(crop_path, cls)
+                if not os.path.isdir(cls_path): continue
+                
+                # Create a unique class name: Crop_Disease
+                full_cls_name = f"{crop}_{cls}"
+                if full_cls_name not in self.classes:
+                    self.classes.append(full_cls_name)
+                
+                cls_idx = self.classes.index(full_cls_name)
+                
+                count = 0
+                for img in os.listdir(cls_path):
+                    if img.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.webp')):
+                        self.samples.append((os.path.join(cls_path, img), cls_idx))
+                        count += 1
+                print(f"    - Found {count} images for {full_cls_name}")
+        
+        print(f"Total images found: {len(self.samples)}")
+        print(f"Total classes: {len(self.classes)}")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        path, target = self.samples[idx]
+        try:
+            img = Image.open(path).convert('RGB')
+        except Exception as e:
+            print(f"Error loading {path}: {e}")
+            # Return a dummy image if one fails
+            img = Image.new('RGB', (224, 224), color='black')
+            
+        if self.transform:
+            img = self.transform(img)
+        return img, target
+
 def train_model():
-    data_dir = '../data/wheat_leaf'
-    batch_size = 16
-    num_epochs = 5
+    data_dir = '../data'
+    batch_size = 32
+    num_epochs = 10  # Increased epochs for more data
     learning_rate = 0.001
+    model_name = 'plant_health_model.pth'
 
     if not os.path.exists(data_dir):
         print(f"Error: Data directory {data_dir} not found.")
         return
 
-    # Check device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
@@ -24,14 +79,19 @@ def train_model():
     data_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(15),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-    # Load dataset
-    full_dataset = datasets.ImageFolder(data_dir, transform=data_transform)
+    # Load multi-crop dataset
+    full_dataset = MultiCropDataset(data_dir, transform=data_transform)
+    if len(full_dataset) == 0:
+        print("No images found. Check your data directory structure.")
+        return
+        
     class_names = full_dataset.classes
-    print(f"Classes found: {class_names}")
 
     # Split dataset
     train_size = int(0.8 * len(full_dataset))
@@ -45,7 +105,7 @@ def train_model():
     weights = models.MobileNet_V2_Weights.DEFAULT
     model = models.mobilenet_v2(weights=weights)
     
-    # Freeze parameters
+    # Freeze initial layers
     for param in model.parameters():
         param.requires_grad = False
         
@@ -55,6 +115,7 @@ def train_model():
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
+    # Unfreeze the classifier for training
     optimizer = optim.Adam(model.classifier[1].parameters(), lr=learning_rate)
 
     best_acc = 0.0
@@ -98,7 +159,6 @@ def train_model():
 
             print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
 
-            # Save best model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = model.state_dict()
@@ -107,16 +167,22 @@ def train_model():
 
     print(f'Best val Acc: {best_acc:4f}')
     
-    # Load best model weights and save
     model.load_state_dict(best_model_wts)
     
     # Save model and class mapping
-    save_path = 'wheat_leaf_model.pth'
     torch.save({
         'model_state_dict': model.state_dict(),
         'classes': class_names
-    }, save_path)
-    print(f"Model saved to {save_path}")
+    }, model_name)
+    
+    # Also save a copy as wheat_leaf_model.pth for backward compatibility if needed, 
+    # but the server should be updated to use the new name.
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'classes': class_names
+    }, 'wheat_leaf_model.pth')
+    
+    print(f"Model saved to {model_name} (and wheat_leaf_model.pth)")
 
 if __name__ == '__main__':
     train_model()

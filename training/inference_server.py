@@ -25,14 +25,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_PATH = Path(__file__).parent / "wheat_leaf_model.pth"
+# Check for multi-crop model first, then legacy wheat model
+MODEL_PATH = Path(__file__).parent / "plant_health_model.pth"
+if not MODEL_PATH.exists():
+    MODEL_PATH = Path(__file__).parent / "wheat_leaf_model.pth"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = None
 classes = []
 
+def parse_class_name(class_name):
+    """Parses 'crop_disease' into ('Crop', 'Disease')"""
+    if "_" in class_name:
+        parts = class_name.split("_", 1)
+        crop = parts[0].replace("_", " ").title()
+        disease = parts[1].replace("_", " ").title()
+        return crop, disease
+    return "Unknown", class_name.replace("_", " ").title()
+
 def get_severity(confidence: float, disease_name: str) -> str:
-    if disease_name.lower() == "healthy":
+    if "healthy" in disease_name.lower():
         return "Healthy"
     if confidence >= 85:
         return "Severe"
@@ -52,8 +64,10 @@ def estimate_affected_area(severity: str, confidence: float) -> int:
 def load_model():
     global model, classes
     if not MODEL_PATH.exists():
-        raise FileNotFoundError(f"Model not found at {MODEL_PATH}")
+        print(f"[ERROR] Model not found at {MODEL_PATH}")
+        return
     
+    print(f"Loading model from {MODEL_PATH}...")
     checkpoint = torch.load(MODEL_PATH, map_location=device)
     classes = checkpoint["classes"]
     
@@ -79,7 +93,7 @@ def startup_event():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model_loaded": model is not None, "classes": classes}
+    return {"status": "ok", "model_loaded": model is not None, "classes": classes, "model_path": str(MODEL_PATH)}
 
 @app.post("/predict")
 async def predict(image: UploadFile = File(...)):
@@ -100,29 +114,31 @@ async def predict(image: UploadFile = File(...)):
     
     top_probs, top_indices = torch.topk(probabilities, len(classes))
     
-    top_class = classes[top_indices[0].item()]
+    top_class_raw = classes[top_indices[0].item()]
     top_conf = round(top_probs[0].item() * 100, 1)
     
-    severity = get_severity(top_conf, top_class)
+    crop, disease = parse_class_name(top_class_raw)
+    severity = get_severity(top_conf, disease)
     affected_area = estimate_affected_area(severity, top_conf)
     
-    predictions = [
-        {
-            "label": classes[idx.item()],
-            "crop": "Wheat",
-            "disease": classes[idx.item()],
+    predictions = []
+    for i in range(min(5, len(classes))):
+        c_raw = classes[top_indices[i].item()]
+        c_crop, c_disease = parse_class_name(c_raw)
+        predictions.append({
+            "label": c_raw,
+            "crop": c_crop,
+            "disease": c_disease,
             "confidence": round(top_probs[i].item() * 100, 1),
-        }
-        for i, idx in enumerate(top_indices)
-    ]
+        })
     
     return {
-        "crop_type": "Wheat",
-        "disease_name": top_class,
+        "crop_type": crop,
+        "disease_name": disease,
         "confidence": top_conf,
         "severity_level": severity,
         "affected_area_percent": affected_area,
-        "low_confidence": top_probs[0].item() < 0.80,
+        "low_confidence": top_probs[0].item() < 0.70,
         "raw_predictions": predictions,
     }
 
