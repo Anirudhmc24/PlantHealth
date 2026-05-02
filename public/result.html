@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Result - PlantHealth</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/dashboard.html" class="nav-brand">&#127807; PlantHealth</a>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <a href="/dashboard.html" class="btn btn-outline" style="padding: 0.5rem 1rem;">New Scan</a>
+            <button id="logoutBtn" class="btn btn-outline" style="padding: 0.5rem 1rem;">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div id="statusMsg" style="text-align:center; padding:2rem; color: var(--text-light);">
+            Loading result...
+        </div>
+
+        <div id="resultContent" style="display:none;">
+            <div class="result-header">
+                <h1 id="diseaseName" style="font-size: 2.5rem; margin-bottom: 0.5rem; color: var(--primary-dark);"></h1>
+                <p id="cropName" style="font-size: 1.25rem; color: var(--text-light);"></p>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Severity</div>
+                    <div id="severityValue" class="metric-value"></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Confidence</div>
+                    <div id="confidenceValue" class="metric-value" style="color: var(--primary);"></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Affected Area</div>
+                    <div id="areaValue" class="metric-value" style="color: var(--warning);"></div>
+                </div>
+            </div>
+
+            <div class="treatment-box">
+                <h3>&#128138; Treatment Recommendations</h3>
+                <div id="treatmentAdvice" class="markdown-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/result.js"></script>
+</body>
+</html>

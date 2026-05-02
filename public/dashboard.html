@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - PlantHealth</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/dashboard.html" class="nav-brand">🌱 PlantHealth</a>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span id="userNameDisplay" style="font-weight: 500;"></span>
+            <button onclick="logout()" class="btn btn-outline" style="padding: 0.5rem 1rem;">Logout</button>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="glass-container" style="max-width: 600px; margin: 2rem auto; text-align: center;">
+            <h2 style="margin-bottom: 0.5rem;">Diagnose a Plant</h2>
+            <p style="color: var(--text-light); margin-bottom: 2rem;">Upload a clear photo of the affected leaf.</p>
+            
+            <div class="upload-zone" id="dropZone">
+                <div class="upload-icon">📸</div>
+                <div class="upload-text">Drag & Drop an image here</div>
+                <div class="upload-subtext">or click to browse files</div>
+                <input type="file" id="fileInput" accept="image/*">
+            </div>
+
+            <div id="previewContainer">
+                <img id="imagePreview" src="" alt="Preview">
+                <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+                    <button id="cancelBtn" class="btn btn-outline btn-block">Cancel</button>
+                    <button id="analyzeBtn" class="btn btn-primary btn-block">Analyze Image</button>
+                </div>
+            </div>
+            
+            <div id="errorAlert" class="alert error" style="margin-top: 1.5rem;"></div>
+        </div>
+    </div>
+
+    <div class="loader-overlay" id="loader">
+        <div class="spinner"></div>
+        <h3 style="margin-top: 1rem; color: var(--primary-dark);">Analyzing with AI...</h3>
+        <p style="color: var(--text-light); margin-top: 0.5rem;">This may take a few seconds</p>
+    </div>
+    
+    <script src="/js/auth.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

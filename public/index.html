@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlantHealth - AI Crop Protection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .hero {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            min-height: 80vh;
+        }
+        .hero-content h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero-content p {
+            font-size: 1.25rem;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">🌱 PlantHealth</a>
+        <div>
+            <a href="/login.html" class="btn btn-outline" style="padding: 0.5rem 1rem;">Login</a>
+        </div>
+    </nav>
+    
+    <div class="container hero">
+        <div class="hero-content">
+            <h1>Protect Your Farm with AI</h1>
+            <p>Upload a photo of a sick plant leaf, and our advanced AI will instantly identify the disease and provide you with actionable, step-by-step treatment recommendations.</p>
+            <div class="hero-buttons">
+                <a href="/register.html" class="btn btn-primary">Get Started for Free</a>
+                <a href="/login.html" class="btn btn-outline">Sign In</a>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/js/auth.js"></script>
+</body>
+</html>
