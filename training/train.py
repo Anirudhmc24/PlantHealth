@@ -15,35 +15,45 @@ class MultiCropDataset(Dataset):
         self.classes = []
         
         # Crops to ignore (database files etc)
-        ignore = ['db.json', 'plantdisease.db', 'plantdisease.db-shm', 'plantdisease.db-wal']
+        ignore = ['db.json', 'plantdisease.db', 'plantdisease.db-shm', 'plantdisease.db-wal', 'PlantVillage']
         
         print(f"Scanning data directory: {root_dir}")
-        for crop in sorted(os.listdir(root_dir)):
-            if crop in ignore: continue
-            crop_path = os.path.join(root_dir, crop)
-            if not os.path.isdir(crop_path): continue
+        for item in sorted(os.listdir(root_dir)):
+            if item in ignore: continue
+            item_path = os.path.join(root_dir, item)
+            if not os.path.isdir(item_path): continue
             
-            print(f"  Processing crop: {crop}")
-            for cls in sorted(os.listdir(crop_path)):
-                cls_path = os.path.join(crop_path, cls)
-                if not os.path.isdir(cls_path): continue
-                
-                # Create a unique class name: Crop_Disease
-                full_cls_name = f"{crop}_{cls}"
-                if full_cls_name not in self.classes:
-                    self.classes.append(full_cls_name)
-                
-                cls_idx = self.classes.index(full_cls_name)
-                
-                count = 0
-                for img in os.listdir(cls_path):
-                    if img.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.webp')):
-                        self.samples.append((os.path.join(cls_path, img), cls_idx))
-                        count += 1
-                print(f"    - Found {count} images for {full_cls_name}")
+            # Check if this directory contains images directly (Flat structure like PlantVillage)
+            has_images = any(f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.webp')) for f in os.listdir(item_path))
+            
+            if has_images:
+                # Root level class (e.g. Potato___Early_blight)
+                self._add_class_from_dir(item, item_path)
+            else:
+                # Nested structure (e.g. rice_leaf/Brown spot)
+                print(f"  Processing nested crop: {item}")
+                for sub_item in sorted(os.listdir(item_path)):
+                    sub_item_path = os.path.join(item_path, sub_item)
+                    if not os.path.isdir(sub_item_path): continue
+                    
+                    full_cls_name = f"{item}_{sub_item}"
+                    self._add_class_from_dir(full_cls_name, sub_item_path)
         
         print(f"Total images found: {len(self.samples)}")
         print(f"Total classes: {len(self.classes)}")
+
+    def _add_class_from_dir(self, class_name, dir_path):
+        if class_name not in self.classes:
+            self.classes.append(class_name)
+        
+        cls_idx = self.classes.index(class_name)
+        count = 0
+        for img in os.listdir(dir_path):
+            if img.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.webp')):
+                self.samples.append((os.path.join(dir_path, img), cls_idx))
+                count += 1
+        if count > 0:
+            print(f"    - Found {count} images for {class_name}")
 
     def __len__(self):
         return len(self.samples)
@@ -64,7 +74,7 @@ class MultiCropDataset(Dataset):
 def train_model():
     data_dir = '../data'
     batch_size = 32
-    num_epochs = 10  # Increased epochs for more data
+    num_epochs = 5  # Reduced for faster feedback, usually sufficient for transfer learning
     learning_rate = 0.001
     model_name = 'plant_health_model.pth'
 
@@ -136,6 +146,7 @@ def train_model():
             running_loss = 0.0
             running_corrects = 0
 
+            batch_idx = 0
             for inputs, labels in tqdm(dataloader, desc=phase):
                 inputs = inputs.to(device)
                 labels = labels.to(device)
@@ -153,6 +164,23 @@ def train_model():
 
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
+                
+                # Real-time logging every 10 batches
+                batch_idx += 1
+                if batch_idx % 10 == 0 or batch_idx == len(dataloader):
+                    import json
+                    log_data = {
+                        "epoch": epoch + 1,
+                        "num_epochs": num_epochs,
+                        "phase": phase,
+                        "batch": batch_idx,
+                        "total_batches": len(dataloader),
+                        "loss": running_loss / (batch_idx * batch_size),
+                        "accuracy": float(running_corrects) / (batch_idx * batch_size),
+                        "best_accuracy": float(best_acc)
+                    }
+                    with open('../public/training_log.json', 'w') as f:
+                        json.dump(log_data, f)
 
             epoch_loss = running_loss / len(dataloader.dataset)
             epoch_acc = running_corrects.double() / len(dataloader.dataset)

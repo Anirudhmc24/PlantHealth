@@ -35,8 +35,13 @@ model = None
 classes = []
 
 def parse_class_name(class_name):
-    """Parses 'crop_disease' into ('Crop', 'Disease')"""
-    if "_" in class_name:
+    """Parses 'crop_disease' or 'Crop___Disease' into ('Crop', 'Disease')"""
+    if "___" in class_name:
+        parts = class_name.split("___", 1)
+        crop = parts[0].replace("_", " ").title()
+        disease = parts[1].replace("_", " ").title()
+        return crop, disease
+    elif "_" in class_name:
         parts = class_name.split("_", 1)
         crop = parts[0].replace("_", " ").title()
         disease = parts[1].replace("_", " ").title()

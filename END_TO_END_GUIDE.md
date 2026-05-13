@@ -50,7 +50,6 @@ Open `.env` and fill in:
 ```
 ANTHROPIC_API_KEY=your_key_here         # (Optional - legacy)
 GEMINI_API_KEY=your_gemini_key_here     # For treatment advice
-HUGGINGFACE_API_KEY=your_hf_key_here    # (Not needed if using local model)
 ```
 
 > **Note:** The Gemini API key is used for generating treatment advice. If you don't have one, the app will use a built-in fallback treatment message.
@@ -59,7 +58,7 @@ HUGGINGFACE_API_KEY=your_hf_key_here    # (Not needed if using local model)
 
 ## 4. Setting Up the Local AI Model (Python)
 
-We use a custom-trained **MobileNetV2** model to classify plant diseases across multiple crops (**Wheat, Corn, and Rice**). The trained model is included in the repository at `training/plant_health_model.pth`.
+We use a custom-trained **MobileNetV2** model to classify plant diseases across 25+ classes (including Wheat, Rice, Corn, Potato, Tomato, and Pepper). The trained model is already included in the repository at `training/plant_health_model.pth`.
 
 ### Set Up Python Environment
 ```bash
@@ -129,19 +128,25 @@ Now open your browser and go to **http://localhost:3000**
 
 ---
 
-### Adding New Crops
-You can expand the model's capability by simply dropping new crop folders into `data/`. The structure should be:
+## 7. Re-Training the Model (Optional)
+
+If you want to train the model yourself on the expanded dataset:
+
+### Download the Dataset
+1. Download the [Wheat Leaf Dataset](https://www.kaggle.com/datasets/olyadgetch/wheat-leaf-dataset) and place it in `data/wheat_leaf/`.
+2. Download the [PlantVillage Dataset](https://www.kaggle.com/datasets/emmarex/plantdisease) and place the folders directly in the `data/` folder.
+
+The directory structure should look like:
 ```
 PlantHealth/
 ├── data/
-│   ├── wheat_leaf/
-│   │   ├── Healthy/
-│   │   └── septoria/
-│   ├── corn_leaf/
-│   │   ├── Blight/
-│   │   └── Healthy/
-│   └── rice_leaf/
-│       └── Brown spot/
+│   └── wheat_leaf/
+│       ├── Healthy/
+│       ├── septoria/
+│       └── stripe_rust/
+│   ├── Potato___Early_blight/
+│   ├── Tomato_healthy/
+│   └── ... (other PlantVillage folders)
 ```
 
 ### Run Training
@@ -150,9 +155,10 @@ cd training
 # (Make sure venv is activated)
 python train.py
 ```
-- The script automatically scans all folders in `data/` and creates a multi-class model.
-- Training runs for 10 epochs using transfer learning.
-- Saves the best model to `training/plant_health_model.pth`.
+- Training runs for 5 epochs using transfer learning on MobileNetV2
+- Automatically uses GPU (CUDA) if available, otherwise CPU
+- Saves the best model to `training/plant_health_model.pth`
+- **Live Dashboard**: You can monitor training progress at **http://localhost:3000/training_progress.html** while the script is running.
 
 ---
 
@@ -205,11 +211,11 @@ PlantHealth/
 │   ├── huggingface.js         # Local AI model client
 │   └── claude.js              # Gemini treatment advice client
 ├── training/                  # ML training pipeline
-│   ├── train.py               # PyTorch model training script (supports multi-crop)
+│   ├── train.py               # PyTorch model training script
 │   ├── predict.py             # CLI prediction utility
 │   ├── inference_server.py    # FastAPI local model server (port 5001)
 │   ├── requirements.txt       # Python dependencies
-│   └── plant_health_model.pth # Trained multi-crop model weights
+│   └── wheat_leaf_model.pth   # Trained model weights
 └── data/                      # Runtime data (git-ignored)
     └── plantdisease.db / db.json
 ```
