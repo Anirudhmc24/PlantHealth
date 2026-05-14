@@ -46,6 +46,34 @@
                 <h3>&#128138; Treatment Recommendations</h3>
                 <div id="treatmentAdvice" class="markdown-body"></div>
             </div>
+
+            <div class="feedback-box" style="margin-top: 2rem; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <h3 style="margin-bottom: 1rem; color: var(--primary-dark);">Help Us Improve</h3>
+                <div id="feedbackPrompt">
+                    <p style="margin-bottom: 1rem;">Was this diagnosis correct?</p>
+                    <div style="display: flex; gap: 1rem;">
+                        <button id="btnFeedbackYes" class="btn" style="background: var(--primary); padding: 0.5rem 1.5rem;">Yes</button>
+                        <button id="btnFeedbackNo" class="btn" style="background: #ef4444; padding: 0.5rem 1.5rem;">No</button>
+                    </div>
+                </div>
+                
+                <div id="feedbackForm" style="display: none; margin-top: 1rem;">
+                    <p style="margin-bottom: 0.5rem; color: #b91c1c;">We're sorry about that. Please help us learn by providing the correct information:</p>
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label style="display:block; margin-bottom:0.5rem; font-weight:500;" for="correctDisease">What is the correct disease? (Optional)</label>
+                        <input type="text" id="correctDisease" class="form-control" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:6px;" placeholder="e.g., Tomato Blight">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label style="display:block; margin-bottom:0.5rem; font-weight:500;" for="feedbackComments">Additional Comments / Symptoms</label>
+                        <textarea id="feedbackComments" class="form-control" rows="3" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:6px;" placeholder="Describe the symptoms you see..."></textarea>
+                    </div>
+                    <button id="submitFeedbackBtn" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">Submit Correction</button>
+                </div>
+                
+                <div id="feedbackSuccess" style="display: none; margin-top: 1rem; padding: 1rem; background: #ecfdf5; color: #065f46; border-radius: 8px; font-weight: 500;">
+                    Thank you! Your feedback has been recorded. <br><span id="improvedAdviceNotice" style="display:none; color: #991b1b; font-weight: 600; margin-top: 0.5rem;">Generating improved advice...</span>
+                </div>
+            </div>
         </div>
     </div>
 

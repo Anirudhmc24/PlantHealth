@@ -67,4 +67,85 @@ if (!scanId) {
     .catch(function (err) {
         showError('Network error: ' + err.message);
     });
+
+    // ── Feedback UI Logic ───────────────────────────────────────────────────
+    var btnFeedbackYes = document.getElementById('btnFeedbackYes');
+    var btnFeedbackNo = document.getElementById('btnFeedbackNo');
+    var feedbackForm = document.getElementById('feedbackForm');
+    var submitFeedbackBtn = document.getElementById('submitFeedbackBtn');
+    var feedbackPrompt = document.getElementById('feedbackPrompt');
+    var feedbackSuccess = document.getElementById('feedbackSuccess');
+    var improvedAdviceNotice = document.getElementById('improvedAdviceNotice');
+
+    function submitFeedback(wasCorrect, details) {
+        var payload = { scan_id: scanId, was_correct: wasCorrect };
+        if (details) {
+            payload.correct_disease = details.disease;
+            payload.comments = details.comments;
+        }
+
+        return fetch('/api/feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify(payload)
+        }).then(function(r) { return r.json(); });
+    }
+
+    btnFeedbackYes.addEventListener('click', function() {
+        submitFeedback(true).then(function(res) {
+            if (res.success) {
+                feedbackPrompt.style.display = 'none';
+                feedbackSuccess.style.display = 'block';
+            } else {
+                alert('Error submitting feedback: ' + res.error);
+            }
+        }).catch(function(err) {
+            alert('Error: ' + err.message);
+        });
+    });
+
+    btnFeedbackNo.addEventListener('click', function() {
+        feedbackPrompt.style.display = 'none';
+        feedbackForm.style.display = 'block';
+    });
+
+    submitFeedbackBtn.addEventListener('click', function() {
+        var disease = document.getElementById('correctDisease').value;
+        var comments = document.getElementById('feedbackComments').value;
+        
+        submitFeedbackBtn.disabled = true;
+        submitFeedbackBtn.textContent = 'Submitting...';
+        
+        feedbackSuccess.style.display = 'block';
+        improvedAdviceNotice.style.display = 'inline';
+        
+        submitFeedback(false, { disease: disease, comments: comments }).then(function(res) {
+            if (res.success) {
+                feedbackForm.style.display = 'none';
+                improvedAdviceNotice.style.display = 'none';
+                
+                if (res.improved_advice) {
+                    document.getElementById('treatmentAdvice').innerHTML = md(res.improved_advice);
+                    // Add a visual cue that it was updated
+                    document.getElementById('treatmentAdvice').style.border = '2px solid #10b981';
+                    document.getElementById('treatmentAdvice').style.padding = '1rem';
+                    document.getElementById('treatmentAdvice').style.borderRadius = '8px';
+                }
+            } else {
+                alert('Error submitting feedback: ' + res.error);
+                submitFeedbackBtn.disabled = false;
+                submitFeedbackBtn.textContent = 'Submit Correction';
+                feedbackSuccess.style.display = 'none';
+            }
+        }).catch(function(err) {
+            alert('Error: ' + err.message);
+            submitFeedbackBtn.disabled = false;
+            submitFeedbackBtn.textContent = 'Submit Correction';
+            feedbackSuccess.style.display = 'none';
+        });
+    });
 }
+
